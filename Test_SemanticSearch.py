@@ -1,9 +1,8 @@
-import os
 import numpy as np
 import pandas as pd
 from pathlib import Path
 import streamlit as st
-import joblib
+import pickle
 import plotly.express as px
 import plotly.graph_objects as go 
 import gdown
@@ -47,8 +46,10 @@ def load_assets():
     embeddings = np.load(embeddings_path)
     umap_2d = np.load(umap_embeddings_path)
     docs = pd.read_csv(data_file_path)
-    umap_model = joblib.load(umap_model_path)
-    pca_model = joblib.load(pca_model_path)
+    with open(umap_model_path, "rb") as f:
+        umap_model = pickle.load(f)
+    with open(pca_model_path, "rb") as f:
+        pca_model = pickle.load(f) 
     return embeddings, umap_2d, docs, umap_model, pca_model
 
 embeddings, umap_2d, docs, umap_model, pca_model = load_assets()
@@ -98,13 +99,18 @@ if query:
         highlight_indices = top_results[:top_k].cpu().numpy()
 
     documents = docs.title_narrative
+    reporting_org = docs.reporting_org_name
+    funding = docs.Funding
+
     labels = ["Match" if i in highlight_indices else "Other" for i in range(len(documents))]
 
     df = pd.DataFrame({
         "UMAP_1": umap_2d[:, 0],
         "UMAP_2": umap_2d[:, 1],
         "Label": labels,
-        "Text": documents
+        "Text": documents,
+        "Reporting Org": reporting_org,
+        "Funding": funding,
     })
 
     df["Title"] = df["Text"].str.slice(0, 100) + "..."
@@ -118,7 +124,7 @@ if query:
         y="UMAP_2",
         color="Label",
         color_discrete_map=color_discrete_map,
-        hover_data={"Text": False, "Title": True, "Index": True, "UMAP_1": False, "UMAP_2": False},
+        hover_data={"Text": False, "Title": True, "Index": True, "Reporting Org": True, "Funding":True, "UMAP_1": False, "UMAP_2": False},
         opacity=0.7,
         title=f"Top {top_k} semantic matches for: '{query}' ({similarity_measure})",
         width=900,
